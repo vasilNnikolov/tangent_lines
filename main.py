@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 import filter
 
-input_filename = "long_vid.webm"
+input_filename = "face.webm"
 
 vidcap = cv2.VideoCapture(input_filename)
 success = True
@@ -19,7 +19,7 @@ output_width, output_height = (
     int(scaling_coefficient * input_height),
 )
 out = cv2.VideoWriter(
-    "output_long_vid.avi",
+    "output_face.avi",
     cv2.VideoWriter_fourcc(*"MJPG"),
     fps,
     (output_width, output_height),
