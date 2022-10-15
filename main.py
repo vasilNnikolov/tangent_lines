@@ -3,7 +3,9 @@ from tqdm import tqdm
 
 import filter
 
-vidcap = cv2.VideoCapture("vid_2.webm")
+input_filename = "long_vid.webm"
+
+vidcap = cv2.VideoCapture(input_filename)
 success = True
 
 frame_count = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -17,7 +19,7 @@ output_width, output_height = (
     int(scaling_coefficient * input_height),
 )
 out = cv2.VideoWriter(
-    "filename_2_blur_10px.avi",
+    "output_long_vid.avi",
     cv2.VideoWriter_fourcc(*"MJPG"),
     fps,
     (output_width, output_height),
