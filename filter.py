@@ -26,30 +26,43 @@ def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
     gradient = gradient_of_image(image).astype(np.float32)
     gradient_magnitude = (gradient[:, :, 0] ** 2 + gradient[:, :, 1] ** 2) ** 0.5
 
-    # scale gradient in range (0, 255)
-    gradient_scaling_coefficient = np.quantile(gradient_magnitude, 0.999) / 200.0
-    gradient_magnitude /= gradient_scaling_coefficient
-    gradient_magnitude = np.clip(gradient_magnitude, 0, 255)
-
-    gradient /= gradient_scaling_coefficient
-
     edge_coords = np.moveaxis(np.mgrid[0 : image.shape[0], 0 : image.shape[1]], 0, -1)[
         gradient_magnitude > np.quantile(gradient_magnitude, 0.8)
     ]
     N = min(len(edge_coords), 10000)
     edge_coords = edge_coords[np.random.randint(0, len(edge_coords), N)]
 
+    # from this point on, we only care about coordinates which are in edge_coords
+    edge_gradients = gradient[tuple(edge_coords.T)]
+    points_gradient_magnitudes = gradient_magnitude[tuple(edge_coords.T)]
+
+    normalised_gradient_magnitudes = points_gradient_magnitudes / np.max(
+        points_gradient_magnitudes
+    )
+
+    # make their length 1
+    normalised_perpendicular_vectors = (
+        edge_gradients / points_gradient_magnitudes[:, np.newaxis]
+    )
+
+    # turn them 90 degrees
+    normalised_perpendicular_vectors = np.stack(
+        [
+            normalised_perpendicular_vectors[:, 1],
+            -normalised_perpendicular_vectors[:, 0],
+        ],
+        axis=1,
+    )
+
+    # drawing parameters
     line_length = 0.03 * np.min(image.shape)
     line_thickness = min(1, output_shape[0] // 500)
-    for p in edge_coords:
-        n = gradient[tuple(p)].astype(np.float32)
-        n_len = gradient_magnitude[tuple(p)]
-        if n_len < 0.0001:
-            continue
-        n_perpendicular = np.array([-n[1], n[0]]) / n_len
 
-        color = int(((n_len / 255) ** 0.5) * 255)
-        # color = n_len // 2
+    # line drawing
+    for index, p in enumerate(edge_coords):
+        n_perpendicular = normalised_perpendicular_vectors[index]
+
+        color = int((normalised_gradient_magnitudes[index] ** 0.5) * 255)
         start = np.flip(
             scale_factor * (p - (n_perpendicular * line_length)), axis=0
         ).astype(np.int16)
