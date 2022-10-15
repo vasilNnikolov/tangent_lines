@@ -15,11 +15,9 @@ out = cv2.VideoWriter(
     "filename_2.avi", cv2.VideoWriter_fourcc(*"MJPG"), fps, (width, height)
 )
 print(width, height)
-for i in tqdm(range(frame_count)):
+for i in tqdm(range(10)):
+    # for i in tqdm(range(frame_count)):
     success, image = vidcap.read()
-
-    # if i > 10:
-    #     break
     if not success:
         print(f"error on frame {i}")
     filtered_im = cv2.resize(filter.filter_image(image), (width, height)).astype(

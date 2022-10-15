@@ -35,7 +35,7 @@ def filter_image(image: np.ndarray, random_coeff=0.0):
     scale_factor = 5000 / image.shape[0]
     output_shape = (np.array(image.shape) * scale_factor).astype(np.int16)
     out_image = np.zeros(output_shape)
-    N_lines = 5000
+    N_lines = 50000
     points_to_sample = []
     image_max = np.max(image)
     while len(points_to_sample) < N_lines:
@@ -49,31 +49,21 @@ def filter_image(image: np.ndarray, random_coeff=0.0):
             points_to_sample.append(point)
 
     gradient = gradient_of_image(image).astype(np.float32)
-    gradient /= np.quantile(gradient, 0.99) / 255.0
-    gradient = np.clip(gradient, 0, 255.0)
-    # return (gradient[:, :, 0] ** 2 + gradient[:, :, 1] ** 2) ** 0.5
+    gradient_magnitude = (gradient[:, :, 0] ** 2 + gradient[:, :, 1] ** 2) ** 0.5
+    gradient_magnitude /= np.quantile(gradient_magnitude, 0.99) / 255.0
+    gradient_magnitude = np.clip(gradient_magnitude, 0, 255)
 
-    # max_grad = (
-    #     np.quantile((gradient[:, :, 0] ** 2 + gradient[:, :, 1] ** 2), 0.9) ** 0.5
-    # )
+    # return gradient_magnitude
 
-    line_length = 0.2 * np.min(image.shape)
+    line_length = 0.1 * np.min(image.shape)
     for p in points_to_sample:
         n = gradient[tuple(p)].astype(np.float32)
-        n_len = (n[0] ** 2 + n[1] ** 2) ** 0.5
+        n_len = gradient_magnitude[tuple(p)]
         if n_len < 0.0001:
             continue
         n_perpendicular = np.array([-n[1], n[0]]) / n_len
-        # add randomness to the angle of the tangent line
-        # if random_coeff > 0.001:
-        #     n_perpendicular = (
-        #         n_perpendicular
-        #         + (np.random.random((2,)) - np.array([0.5, 0.5])) * random_coeff
-        #     )
 
-        strength = image[tuple(p)] / 255.0
-        # strength = min(n_len / max_grad, 1.0)
-        color = np.array([255, 255, 255]) * strength
+        color = int(n_len)
         thickness = 1
         start = np.flip(
             scale_factor * (p - (n_perpendicular * line_length)), axis=0
@@ -87,7 +77,7 @@ def filter_image(image: np.ndarray, random_coeff=0.0):
             out_image,
             start,
             end,
-            int(color[0]),
+            color,
             thickness,
         )
 
