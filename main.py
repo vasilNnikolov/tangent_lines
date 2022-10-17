@@ -3,9 +3,10 @@ from tqdm import tqdm
 
 import filter
 
-input_filename = "face.webm"
+input_filename = "lozenetz.mp4"
 
 vidcap = cv2.VideoCapture(input_filename)
+print(input_filename)
 success = True
 
 frame_count = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -13,19 +14,19 @@ fps = vidcap.get(cv2.CAP_PROP_FPS)
 input_width = int(vidcap.get(cv2.CAP_PROP_FRAME_WIDTH))
 input_height = int(vidcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-scaling_coefficient = 2
+scaling_coefficient = 1
 output_width, output_height = (
     int(scaling_coefficient * input_width),
     int(scaling_coefficient * input_height),
 )
 out = cv2.VideoWriter(
-    "output_face.avi",
+    "out_lozen.avi",
     cv2.VideoWriter_fourcc(*"MJPG"),
     fps,
     (output_width, output_height),
 )
-# for i in tqdm(range(1)):
-for i in tqdm(range(frame_count)):
+
+for i in tqdm(range(1)):
     success, image = vidcap.read()
     if not success:
         print(f"error on frame {i}")

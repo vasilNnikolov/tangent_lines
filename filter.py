@@ -2,12 +2,12 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
+import timing
+
 
 def gradient_of_image(image):
     image = image.astype(np.float32)
     ksize = 7
-    # gX = cv2.Scharr(image, ddepth=cv2.CV_32F, dx=1, dy=0).astype(np.float32)
-    # gY = cv2.Scharr(image, ddepth=cv2.CV_32F, dx=0, dy=1).astype(np.float32)
     gX = cv2.Sobel(image, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=ksize).astype(np.float32)
     gY = cv2.Sobel(image, ddepth=cv2.CV_32F, dx=0, dy=1, ksize=ksize).astype(np.float32)
     # tries to kind of normalise the gradient, since brighter areas have higher gradient
@@ -16,18 +16,29 @@ def gradient_of_image(image):
 
 
 def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
+    timer = timing.Timer()
+    timer.add_checkpoint("cvt_image_to_gray")
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # blur image
+    timer.add_checkpoint("blur")
     blur_size = (2 * int(0.007 * min(image.shape)) + 1,) * 2
     image = cv2.GaussianBlur(image, blur_size, 0)
 
+    timer.add_checkpoint("compute_gradient")
     gradient = gradient_of_image(image)
+
+    timer.add_checkpoint("compute gradient magnitude")
     gradient_magnitude = (gradient[:, :, 0] ** 2 + gradient[:, :, 1] ** 2) ** 0.5
 
-    edge_coords = np.moveaxis(np.mgrid[0 : image.shape[0], 0 : image.shape[1]], 0, -1)[
-        gradient_magnitude > np.quantile(gradient_magnitude, 0.8)
-    ]
+    timer.add_checkpoint("get grid ")
+    grid = np.mgrid[0 : image.shape[0], 0 : image.shape[1]]
+
+    timer.add_checkpoint("pick strongest edges")
+    edge_threshold = np.quantile(gradient_magnitude, 0.8)
+    edge_coords = np.moveaxis(grid, 0, -1)[gradient_magnitude > edge_threshold]
+
+    timer.add_checkpoint("pick random edges")
     # the number of lines that will be drawn
     N = min(len(edge_coords), 10000)
     edge_coords = edge_coords[np.random.randint(0, len(edge_coords), N)]
@@ -36,6 +47,7 @@ def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
     edge_gradients = gradient[tuple(edge_coords.T)]
     points_gradient_magnitudes = gradient_magnitude[tuple(edge_coords.T)]
 
+    timer.add_checkpoint("normalise picked gradients")
     normalised_gradient_magnitudes = points_gradient_magnitudes / np.max(
         points_gradient_magnitudes
     )
@@ -54,6 +66,7 @@ def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
         axis=1,
     )
 
+    timer.add_checkpoint("draw lines")
     output_shape = (np.array(image.shape) * scale_factor).astype(np.int16)
     out_image = np.zeros(tuple(output_shape)).astype(np.uint8)
 
@@ -62,24 +75,30 @@ def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
     line_thickness = min(1, output_shape[0] // 500)
 
     # line drawing
+    line_starts = scale_factor * (
+        edge_coords - normalised_perpendicular_vectors * line_length
+    ).astype(np.uint16)
+    line_ends = scale_factor * (
+        edge_coords + normalised_perpendicular_vectors * line_length
+    ).astype(np.uint16)
     for index, p in enumerate(edge_coords):
-        n_perpendicular = normalised_perpendicular_vectors[index]
-
         color = int((normalised_gradient_magnitudes[index] ** 0.5) * 255)
-        start = np.flip(
-            scale_factor * (p - (n_perpendicular * line_length)), axis=0
-        ).astype(np.int16)
+        # start = np.flip(
+        #     scale_factor * (p - (n_perpendicular * line_length)), axis=0
+        # ).astype(np.int16)
 
-        end = np.flip(
-            scale_factor * (p + (n_perpendicular * line_length)), axis=0
-        ).astype(np.int16)
+        # end = np.flip(
+        #     scale_factor * (p + (n_perpendicular * line_length)), axis=0
+        # ).astype(np.int16)
 
         cv2.line(
             out_image,
-            start,
-            end,
+            line_starts[index],
+            line_ends[index],
             color,
             line_thickness,
         )
+    timer.add_checkpoint("end")
 
+    timer.statistics()
     return out_image
