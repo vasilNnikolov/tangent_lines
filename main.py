@@ -13,6 +13,7 @@ frame_count = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
 fps = vidcap.get(cv2.CAP_PROP_FPS)
 input_width = int(vidcap.get(cv2.CAP_PROP_FRAME_WIDTH))
 input_height = int(vidcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+print(input_height, input_width)
 
 scaling_coefficient = 1
 output_width, output_height = (
@@ -20,13 +21,13 @@ output_width, output_height = (
     int(scaling_coefficient * input_height),
 )
 out = cv2.VideoWriter(
-    "out_lozen.avi",
+    "out_lozen_optimised.avi",
     cv2.VideoWriter_fourcc(*"MJPG"),
     fps,
     (output_width, output_height),
 )
 
-for i in tqdm(range(1)):
+for i in tqdm(range(frame_count // 1)):
     success, image = vidcap.read()
     if not success:
         print(f"error on frame {i}")
