@@ -2,6 +2,7 @@ import cv2
 from tqdm import tqdm
 
 import filter
+import timing
 
 input_filename = "lozenetz.mp4"
 
@@ -21,18 +22,20 @@ output_width, output_height = (
     int(scaling_coefficient * input_height),
 )
 out = cv2.VideoWriter(
-    "out_lozen_optimised.avi",
+    "out_lozen_testing.avi",
     cv2.VideoWriter_fourcc(*"MJPG"),
     fps,
     (output_width, output_height),
 )
 
-for i in tqdm(range(frame_count // 1)):
+timer = timing.Timer()
+for i in tqdm(range(50)):
     success, image = vidcap.read()
     if not success:
         print(f"error on frame {i}")
-    filtered_im = filter.filter_image(image, scale_factor=scaling_coefficient)
+    filtered_im = filter.filter_image(image, timer, scale_factor=scaling_coefficient)
     transformed_image = cv2.cvtColor(filtered_im, cv2.COLOR_GRAY2BGR)
     out.write(transformed_image)
 
+timer.statistics()
 out.release()

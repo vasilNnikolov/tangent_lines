@@ -15,8 +15,7 @@ def gradient_of_image(image):
     return np.stack([gY / (image + offset), gX / (image + offset)], axis=2)
 
 
-def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
-    timer = timing.Timer(disable=True)
+def filter_image(image: np.ndarray, timer: timing.Timer, scale_factor=4) -> np.ndarray:
     timer.add_checkpoint("cvt_image_to_gray")
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -105,5 +104,4 @@ def filter_image(image: np.ndarray, scale_factor=4) -> np.ndarray:
 
     timer.add_checkpoint("end")
 
-    # timer.statistics()
     return out_image
