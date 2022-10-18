@@ -1,6 +1,6 @@
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 import timing
 
@@ -15,7 +15,52 @@ def gradient_of_image(image):
     return np.stack([gY / (image + offset), gX / (image + offset)], axis=2)
 
 
-def filter_image(image: np.ndarray, timer: timing.Timer, scale_factor=4) -> np.ndarray:
+def filter_video(input_filename, output_filename):
+    """
+    filters the video and saves it in a filename
+    """
+    vidcap = cv2.VideoCapture(input_filename)
+    print(input_filename)
+    success = True
+
+    frame_count = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = vidcap.get(cv2.CAP_PROP_FPS)
+    input_width = int(vidcap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    input_height = int(vidcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    scaling_coefficient = 1
+    output_width, output_height = (
+        int(scaling_coefficient * input_width),
+        int(scaling_coefficient * input_height),
+    )
+    out = cv2.VideoWriter(
+        output_filename,
+        cv2.VideoWriter_fourcc(*"MJPG"),
+        fps,
+        (output_width, output_height),
+    )
+
+    timer = timing.Timer()
+    # optimisation so no need to run it for every image
+    coord_grid = np.moveaxis(np.mgrid[0:input_height, 0:input_width], 0, -1)
+    for i in tqdm(range(50)):
+        success, image = vidcap.read()
+        if not success:
+            print(f"error reading on frame {i}")
+
+        filtered_im = filter_image(
+            image, timer, scale_factor=scaling_coefficient, coord_grid=coord_grid
+        )
+        transformed_image = cv2.cvtColor(filtered_im, cv2.COLOR_GRAY2BGR)
+        out.write(transformed_image)
+
+    timer.statistics()
+    out.release()
+
+
+def filter_image(
+    image: np.ndarray, timer: timing.Timer, scale_factor=4, coord_grid=None
+) -> np.ndarray:
     timer.add_checkpoint("cvt_image_to_gray")
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -30,20 +75,23 @@ def filter_image(image: np.ndarray, timer: timing.Timer, scale_factor=4) -> np.n
     timer.add_checkpoint("compute gradient magnitude")
     gradient_magnitude = (gradient[:, :, 0] ** 2 + gradient[:, :, 1] ** 2) ** 0.5
 
-    timer.add_checkpoint("find quantile and get grid")
-    # edge_threshold = np.quantile(gradient_magnitude, 0.8)
+    timer.add_checkpoint("find quantile")
     edge_threshold = np.quantile(
         np.random.choice(
             gradient_magnitude.flatten(),
-            size=int(0.1 * (image.shape[0] * image.shape[1])),
+            size=int(0.1 * image.shape[0] * image.shape[1]),
         ),
         0.8,
     )
 
+    timer.add_checkpoint("get grid")
+    if coord_grid is None:
+        coord_grid = np.moveaxis(
+            np.mgrid[0 : image.shape[0], 0 : image.shape[1]], 0, -1
+        )
+
     timer.add_checkpoint("pick strongest edges")
-    edge_coords = np.moveaxis(np.mgrid[0 : image.shape[0], 0 : image.shape[1]], 0, -1)[
-        gradient_magnitude > edge_threshold
-    ]
+    edge_coords = coord_grid[gradient_magnitude > edge_threshold]
 
     # the number of lines that will be drawn
     timer.add_checkpoint("pick random edges")
