@@ -16,20 +16,34 @@ def gradient_of_image(image: np.ndarray) -> np.ndarray:
     return np.stack([gY / (image + offset), gX / (image + offset)], axis=2)
 
 
-@nb.njit(nb.int_[:, :](nb.float_[:, :], nb.float_, nb.int_[:, :, :]))
-def _pick_random_edge_points(
-    gradient_magnitude: np.ndarray, edge_threshold: np.float_, coord_grid: np.ndarray
-):
+@nb.njit(nb.int_[:, :](nb.float_[:, :], nb.float_))
+def _pick_random_edge_points(gradient_magnitude: np.ndarray, edge_threshold: np.float_):
+    height, width = gradient_magnitude.shape
     edge_coords = []
-    for i in range(gradient_magnitude.shape[0]):
-        for j in range(gradient_magnitude.shape[1]):
+    for i in range(height):
+        for j in range(width):
             if gradient_magnitude[(i, j)] > edge_threshold:
                 edge_coords.append((i, j))
-            # edge_coords = coord_grid[gradient_magnitude > edge_threshold]
 
     edge_coords = np.array(edge_coords)
     N = min(len(edge_coords), 5000)
     return edge_coords[np.random.randint(0, len(edge_coords), N)]
+
+
+# @nb.njit(nb.int_[:, :](nb.float_[:, :], nb.float_))
+# def _pick_random_edge_points(gradient_magnitude: np.ndarray, edge_threshold: np.float_):
+#     height, width = gradient_magnitude.shape
+#     edge_coords = np.zeros((height * width, 2), dtype=np.int_)
+#     n_edges = 0
+#     for i in range(height):
+#         for j in range(width):
+#             if gradient_magnitude[(i, j)] > edge_threshold:
+#                 edge_coords[n_edges] = np.array([i, j])
+#                 n_edges += 1
+
+#     edge_coords = edge_coords[:n_edges, :]
+#     N = min(len(edge_coords), 5000)
+#     return edge_coords[np.random.randint(0, len(edge_coords), N)]
 
 
 def filter_video(input_filename, output_filename):
@@ -108,15 +122,8 @@ def filter_image(
 
     timer.add_checkpoint("pick strongest and random edges")
 
-    edge_coords = _pick_random_edge_points(
-        gradient_magnitude, edge_threshold, coord_grid
-    )
-    # edge_coords = coord_grid[gradient_magnitude > edge_threshold]
-
-    # # the number of lines that will be drawn
-    # timer.add_checkpoint("pick random edges")
-    # N = min(len(edge_coords), 5000)
-    # edge_coords = edge_coords[np.random.randint(0, len(edge_coords), N)]
+    # numba optimised
+    edge_coords = _pick_random_edge_points(gradient_magnitude, edge_threshold)
 
     # from this point on, we only care about coordinates which are in edge_coords
     edge_gradients = gradient[tuple(edge_coords.T)]
