@@ -1,18 +1,35 @@
 import cv2
+import numba as nb
 import numpy as np
 from tqdm import tqdm
 
 import timing
 
 
-def gradient_of_image(image):
+def gradient_of_image(image: np.ndarray) -> np.ndarray:
     image = image.astype(np.float32)
-    ksize = 5
+    ksize = 3
     gX = cv2.Sobel(image, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=ksize).astype(np.float32)
     gY = cv2.Sobel(image, ddepth=cv2.CV_32F, dx=0, dy=1, ksize=ksize).astype(np.float32)
     # tries to kind of normalise the gradient, since brighter areas have higher gradient
     offset = 10
     return np.stack([gY / (image + offset), gX / (image + offset)], axis=2)
+
+
+@nb.njit(nb.int_[:, :](nb.float_[:, :], nb.float_, nb.int_[:, :, :]))
+def _pick_random_edge_points(
+    gradient_magnitude: np.ndarray, edge_threshold: np.float_, coord_grid: np.ndarray
+):
+    edge_coords = []
+    for i in range(gradient_magnitude.shape[0]):
+        for j in range(gradient_magnitude.shape[1]):
+            if gradient_magnitude[(i, j)] > edge_threshold:
+                edge_coords.append((i, j))
+            # edge_coords = coord_grid[gradient_magnitude > edge_threshold]
+
+    edge_coords = np.array(edge_coords)
+    N = min(len(edge_coords), 5000)
+    return edge_coords[np.random.randint(0, len(edge_coords), N)]
 
 
 def filter_video(input_filename, output_filename):
@@ -79,24 +96,27 @@ def filter_image(
     edge_threshold = np.quantile(
         np.random.choice(
             gradient_magnitude.flatten(),
-            size=int(0.1 * image.shape[0] * image.shape[1]),
+            size=int(0.05 * image.shape[0] * image.shape[1]),
         ),
         0.8,
     )
 
-    timer.add_checkpoint("get grid")
     if coord_grid is None:
         coord_grid = np.moveaxis(
             np.mgrid[0 : image.shape[0], 0 : image.shape[1]], 0, -1
         )
 
-    timer.add_checkpoint("pick strongest edges")
-    edge_coords = coord_grid[gradient_magnitude > edge_threshold]
+    timer.add_checkpoint("pick strongest and random edges")
 
-    # the number of lines that will be drawn
-    timer.add_checkpoint("pick random edges")
-    N = min(len(edge_coords), 10000)
-    edge_coords = edge_coords[np.random.randint(0, len(edge_coords), N)]
+    edge_coords = _pick_random_edge_points(
+        gradient_magnitude, edge_threshold, coord_grid
+    )
+    # edge_coords = coord_grid[gradient_magnitude > edge_threshold]
+
+    # # the number of lines that will be drawn
+    # timer.add_checkpoint("pick random edges")
+    # N = min(len(edge_coords), 5000)
+    # edge_coords = edge_coords[np.random.randint(0, len(edge_coords), N)]
 
     # from this point on, we only care about coordinates which are in edge_coords
     edge_gradients = gradient[tuple(edge_coords.T)]
